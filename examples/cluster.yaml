@@ -1,0 +1,30 @@
+# Sanitized example based on the KernelCafe Omni cluster template.
+# IDs and addresses below are documentation-only placeholders.
+
+kind: Cluster
+name: KernelCafe
+kubernetes:
+  version: v1.36.4
+talos:
+  version: v1.14.0
+features:
+  diskEncryption: true
+  backupConfiguration:
+    interval: 6h
+patches:
+  - file: talos/patches/longhorn-storage.yaml
+---
+kind: ControlPlane
+machines:
+  - 00000000-0000-0000-0000-000000000001
+  - 00000000-0000-0000-0000-000000000002
+  - 00000000-0000-0000-0000-000000000003
+patches:
+  - name: schedule-on-control-planes
+    inline:
+      cluster:
+        allowSchedulingOnControlPlanes: true
+---
+kind: Workers
+machines:
+  - 00000000-0000-0000-0000-000000000004
