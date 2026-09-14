@@ -1,0 +1,10 @@
+.env
+*.key
+*.pem
+*.p12
+*.pfx
+*.kubeconfig
+vault-init.json
+talosconfig
+kubeconfig
+secrets/
