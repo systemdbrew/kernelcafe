@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kernelcafe-war-room
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  kernelcafe-war-room.json: |-
+    {
+      "uid": "kernelcafe-war-room-public",
+      "title": "KernelCafe // WAR ROOM",
+      "tags": ["KernelCafe", "NOC", "public-reference"],
+      "timezone": "browser",
+      "refresh": "10s",
+      "schemaVersion": 41,
+      "time": {"from": "now-1h", "to": "now"},
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Nodes Ready",
+          "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "targets": [{"refId": "A", "expr": "sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"})", "instant": true}],
+          "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 3}]}}}
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Pods Not Ready",
+          "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "targets": [{"refId": "A", "expr": "sum(kube_pod_status_ready{condition=\"true\"} == 0)", "instant": true}],
+          "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}, {"color": "red", "value": 5}]}}}
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "PVCs Pending",
+          "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "targets": [{"refId": "A", "expr": "sum(kube_persistentvolumeclaim_status_phase{phase=\"Pending\"} == 1)", "instant": true}],
+          "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}}
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "Cluster CPU",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "targets": [{"refId": "A", "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "CPU %"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}}
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Cluster Memory",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+          "datasource": {"type": "prometheus", "uid": "${DS_PROMETHEUS}"},
+          "targets": [{"refId": "A", "expr": "100 * (1 - (sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)))", "legendFormat": "Memory %"}],
+          "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}}
+        },
+        {
+          "id": 6,
+          "type": "logs",
+          "title": "Recent Warnings / Errors",
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 12},
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"},
+          "targets": [{"refId": "A", "expr": "{namespace=~\".+\"} |~ \"(?i)(warn|error|failed|panic)\"", "queryType": "range"}],
+          "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Descending"}
+        }
+      ],
+      "templating": {
+        "list": [
+          {"name": "DS_PROMETHEUS", "type": "datasource", "query": "prometheus", "hide": 2},
+          {"name": "DS_LOKI", "type": "datasource", "query": "loki", "hide": 2}
+        ]
+      }
+    }
