@@ -1,0 +1,32 @@
+# Documentation-safe example inventory.
+cluster: kernelcafe
+
+networks:
+  primary:
+    cidr: 10.10.20.0/24
+    gateway: 10.10.20.1
+    interface: enp2s0
+  storage:
+    cidr: 10.10.50.0/24
+    interface: enp1s0f0
+
+nodes:
+  - hostname: kernelcafe-cp01
+    role: control-plane
+    primary_ip: 10.10.20.201
+    storage_ip: 10.10.50.201
+
+  - hostname: kernelcafe-cp02
+    role: control-plane
+    primary_ip: 10.10.20.202
+    storage_ip: 10.10.50.202
+
+  - hostname: kernelcafe-cp03
+    role: control-plane
+    primary_ip: 10.10.20.203
+    storage_ip: 10.10.50.203
+
+  - hostname: kernelcafe-wk01
+    role: worker
+    primary_ip: 10.10.20.204
+    storage_ip: 10.10.50.204
