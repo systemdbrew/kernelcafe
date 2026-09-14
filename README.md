@@ -89,6 +89,20 @@ The exact production serial numbers, machine IDs and addresses are intentionally
 ```text
 .
 ├── README.md
+├── argocd/
+│   ├── root-application.yaml
+│   ├── kernelcafe-project.yaml
+│   └── apps/
+│       ├── 10-longhorn.yaml
+│       ├── 12-vault.yaml
+│       ├── 13-external-secrets.yaml
+│       ├── 20-metallb.yaml
+│       ├── 21-metallb-config.yaml
+│       ├── 30-traefik.yaml
+│       ├── 35-monitoring.yaml
+│       ├── 35-monitoring-dashboards.yaml
+│       ├── 36-loki.yaml
+│       └── 37-alloy.yaml
 ├── docs/
 │   ├── architecture.md
 │   ├── secrets.md
@@ -99,14 +113,16 @@ The exact production serial numbers, machine IDs and addresses are intentionally
 ├── infrastructure/
 │   ├── external-secrets/
 │   ├── longhorn/
+│   ├── metallb/
+│   ├── monitoring/dashboards/
 │   ├── networking/
+│   ├── observability/
+│   ├── traefik/
 │   └── vault/
-└── .github/
-    └── workflows/
-        └── gitleaks.yml
+└── .github/workflows/gitleaks.yml
 ```
 
-The private production repository contains the complete Argo CD application tree, workload manifests, dashboards, automation and operational runbooks. This public repository focuses on the reusable design rather than publishing a map of the live environment.
+The public Argo CD tree is deliberately realistic: it demonstrates sync waves, Helm sources, Kustomize-managed configuration and the dependency relationships used by the real platform. Production-only workloads, endpoints, recovery infrastructure and identifying values remain in the private source-of-truth repository.
 
 ## Design principles
 
@@ -167,6 +183,12 @@ Longhorn
 Longhorn replication traffic uses a dedicated secondary interface through Multus and Whereabouts.
 
 See [infrastructure/longhorn/README.md](infrastructure/longhorn/README.md).
+
+## Observability
+
+The public observability example includes Prometheus/Grafana, Loki, Alloy and a sanitized version of the NOC-style `KernelCafe // WAR ROOM` dashboard. It keeps the layout and query patterns while excluding real hosts, public domains, client addresses and production service inventory.
+
+See [infrastructure/observability/README.md](infrastructure/observability/README.md) and [infrastructure/monitoring/dashboards/kernelcafe-war-room.yaml](infrastructure/monitoring/dashboards/kernelcafe-war-room.yaml).
 
 ## Disaster recovery
 

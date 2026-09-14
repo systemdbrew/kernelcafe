@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: kernelcafe
+  namespace: argocd
+spec:
+  description: Sanitized public reference project for KernelCafe
+  sourceRepos:
+    - https://github.com/systemdbrew/kernelcafe.git
+    - https://charts.longhorn.io
+    - https://helm.releases.hashicorp.com
+    - https://charts.external-secrets.io
+    - https://metallb.github.io/metallb
+    - https://traefik.github.io/charts
+    - https://prometheus-community.github.io/helm-charts
+    - https://grafana.github.io/helm-charts
+  destinations:
+    - namespace: '*'
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
