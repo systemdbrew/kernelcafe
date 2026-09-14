@@ -1,0 +1,47 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  yaml-and-kustomize:
+    name: YAML and Kustomize
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install validation tools
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --no-cache-dir yamllint==1.37.1
+          go install sigs.k8s.io/kustomize/kustomize/v5@v5.7.1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Lint YAML
+        run: |
+          set -euo pipefail
+          yamllint .
+
+      - name: Render Kustomize entry points
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find . -type f \( -name kustomization.yaml -o -name kustomization.yml \) -print | sort)
+          if (( ${#files[@]} == 0 )); then
+            echo "No Kustomize entry points found"
+            exit 0
+          fi
+
+          for file in "${files[@]}"; do
+            dir="$(dirname "$file")"
+            echo "::group::kustomize build $dir"
+            kustomize build "$dir" >/dev/null
+            echo "::endgroup::"
+          done

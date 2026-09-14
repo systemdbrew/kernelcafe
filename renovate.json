@@ -1,0 +1,41 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "dependencyDashboard": true,
+  "semanticCommits": "enabled",
+  "labels": [
+    "dependencies"
+  ],
+  "pinDigests": true,
+  "rangeStrategy": "pin",
+  "packageRules": [
+    {
+      "description": "Group non-major Helm and container updates",
+      "matchManagers": [
+        "helm-values",
+        "kubernetes"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "groupName": "platform dependency updates"
+    },
+    {
+      "description": "Do not automerge critical platform updates",
+      "matchPackageNames": [
+        "longhorn/longhorn",
+        "hashicorp/vault",
+        "external-secrets/external-secrets",
+        "traefik/traefik",
+        "prometheus-community/kube-prometheus-stack",
+        "grafana/loki",
+        "grafana/alloy"
+      ],
+      "automerge": false
+    }
+  ]
+}
