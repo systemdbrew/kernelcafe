@@ -1,8 +1,14 @@
 # KernelCafe
 
+[![Validate](https://github.com/systemdbrew/kernelcafe/actions/workflows/validate.yml/badge.svg)](https://github.com/systemdbrew/kernelcafe/actions/workflows/validate.yml)
+[![Gitleaks](https://github.com/systemdbrew/kernelcafe/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/systemdbrew/kernelcafe/actions/workflows/gitleaks.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 KernelCafe is a public, sanitized reference implementation of my home Kubernetes platform.
 
-It mirrors the architecture and engineering decisions used by the private production GitOps repository while intentionally omitting operational identifiers, private addressing, recovery endpoints, hardware serial numbers, credentials, and other environment-specific details.
+It mirrors the architecture and engineering decisions used by the private production GitOps repository while intentionally omitting operational identifiers, production addressing, recovery endpoints, hardware serial numbers, credentials and other environment-specific details.
+
+> **Public reference, not production source of truth.** The manifests are intentionally realistic enough to demonstrate the platform, but values that would map the live environment are replaced or omitted.
 
 ## What this project demonstrates
 
@@ -13,76 +19,86 @@ It mirrors the architecture and engineering decisions used by the private produc
 - dedicated storage networking with Multus + Whereabouts
 - HashiCorp Vault + External Secrets Operator
 - Traefik + MetalLB ingress
-- cert-manager
+- cert-manager architecture
 - Prometheus / Grafana monitoring
 - Loki + Grafana Alloy logging
-- security-focused Grafana dashboards
+- a NOC-style `KernelCafe // WAR ROOM` dashboard
 - Renovate dependency automation
-- Gitleaks secret scanning
-- backup and disaster-recovery design
+- Gitleaks full-history secret scanning
+- YAML/Kustomize CI validation
+- dependency-aware backup and disaster-recovery design
+
+For the engineering rationale and tradeoffs, see [docs/portfolio.md](docs/portfolio.md).
 
 ## Architecture
 
 ```text
-                    GitHub
-                       |
-                       v
-                    Argo CD
-                       |
-        +--------------+--------------+
-        |              |              |
-        v              v              v
-    Platform        Security      Observability
-    --------        --------      -------------
-    MetalLB         Vault         Prometheus
-    Traefik         ESO           Grafana
-    cert-manager                   Loki / Alloy
-    Multus
-
-                       |
-                       v
-               Talos Kubernetes
-         3 control-plane + 1 worker
-                       |
-             +---------+---------+
-             |                   |
-             v                   v
-        Application          Storage
-        workloads            Longhorn
-                                 |
-                      dedicated secondary NIC
-                      Multus + Whereabouts
+                Dedicated management host
+                         Omni
+                          |
+                          v
+                     Talos nodes
+                          |
+                          v
+                       GitHub
+                          |
+                          v
+                       Argo CD
+                          |
+          +---------------+---------------+
+          |               |               |
+          v               v               v
+      Platform         Security      Observability
+      --------         --------      -------------
+      MetalLB          Vault         Prometheus
+      Traefik          ESO           Grafana
+      Multus                          Loki / Alloy
+          |                               |
+          +---------------+---------------+
+                          |
+                          v
+                  Talos Kubernetes
+             3 control-plane + 1 worker
+                          |
+                +---------+---------+
+                |                   |
+                v                   v
+           Applications          Longhorn
+                                     |
+                            dedicated storage NIC
+                          Multus + Whereabouts
 ```
 
-Omni is deliberately hosted outside the Kubernetes cluster so a total cluster failure does not also remove the management plane.
+Omni deliberately lives outside Kubernetes so a total cluster failure does not also remove the management plane.
 
-## Repository model
+## Public vs production
 
-This repository is documentation/reference material rather than the live production source of truth.
+This repository preserves the reusable design while changing or omitting production-specific details.
 
-Values that would identify or expose the production environment are replaced with documentation-safe examples such as:
+| Published here | Kept private |
+| --- | --- |
+| platform architecture | production domain names |
+| sanitized Argo CD applications | real RFC1918/VLAN addressing |
+| example Vault + ESO configuration | hardware serials / Omni machine IDs |
+| Longhorn storage design | backup hosts and filesystem paths |
+| documentation-safe networking | Tailscale/BMC details |
+| sanitized dashboards | SSH host fingerprints |
+| DR dependency model | recovery endpoints and credentials |
 
-- `example.net`
-- `10.10.0.0/16`
-- placeholder Omni machine IDs
-- generic backup targets
-
-Secrets are never committed. Workload credentials are expected to live in Vault and are materialized into Kubernetes Secrets by External Secrets Operator.
+Documentation examples use values such as `example.net`, `10.10.x.x` and placeholder machine IDs. They are not the production values.
 
 ## Cluster profile
 
-The real platform uses small x86 nodes with:
+The platform model uses small x86 nodes with:
 
 - 3 control-plane nodes
 - 1 worker node
 - control-plane scheduling enabled
-- one system NVMe device per node
-- one dedicated SSD for Longhorn
-- one primary application NIC
-- one dedicated Longhorn replication NIC
+- a separate system NVMe device
+- one dedicated SSD per node for Longhorn
+- a primary Kubernetes/application NIC
+- a dedicated Longhorn replication NIC
 - TPM-backed encryption for Longhorn backing storage
-
-The exact production serial numbers, machine IDs and addresses are intentionally absent here.
 
 ## GitOps layout
 
@@ -93,20 +109,11 @@ The exact production serial numbers, machine IDs and addresses are intentionally
 │   ├── root-application.yaml
 │   ├── kernelcafe-project.yaml
 │   └── apps/
-│       ├── 10-longhorn.yaml
-│       ├── 12-vault.yaml
-│       ├── 13-external-secrets.yaml
-│       ├── 20-metallb.yaml
-│       ├── 21-metallb-config.yaml
-│       ├── 30-traefik.yaml
-│       ├── 35-monitoring.yaml
-│       ├── 35-monitoring-dashboards.yaml
-│       ├── 36-loki.yaml
-│       └── 37-alloy.yaml
 ├── docs/
 │   ├── architecture.md
-│   ├── secrets.md
-│   └── disaster-recovery.md
+│   ├── disaster-recovery.md
+│   ├── portfolio.md
+│   └── secrets.md
 ├── examples/
 │   ├── cluster.yaml
 │   └── inventory.yaml
@@ -119,23 +126,28 @@ The exact production serial numbers, machine IDs and addresses are intentionally
 │   ├── observability/
 │   ├── traefik/
 │   └── vault/
-└── .github/workflows/gitleaks.yml
+├── CONTRIBUTING.md
+├── SECURITY.md
+├── LICENSE
+└── .github/workflows/
+    ├── gitleaks.yml
+    └── validate.yml
 ```
 
-The public Argo CD tree is deliberately realistic: it demonstrates sync waves, Helm sources, Kustomize-managed configuration and the dependency relationships used by the real platform. Production-only workloads, endpoints, recovery infrastructure and identifying values remain in the private source-of-truth repository.
+The Argo CD tree demonstrates sync waves, Helm sources, Kustomize-managed configuration and the dependency relationships used by the real platform.
 
 ## Design principles
 
-1. **Git is declarative source of truth.** Routine platform changes go through GitOps.
-2. **Management survives cluster loss.** Omni is outside the cluster.
+1. **Git is the declarative source of truth.** Routine platform changes go through GitOps.
+2. **Management survives cluster loss.** Omni is outside Kubernetes.
 3. **Storage failure domains matter.** Longhorn replicas are spread across physical nodes.
 4. **Storage traffic is isolated.** Longhorn uses a secondary network instead of competing with normal application traffic.
-5. **Secrets do not belong in Git.** Vault owns machine/application secrets; ESO performs delivery.
-6. **Human and machine secrets are separated.** A password manager is used for human credentials and break-glass recovery material; Vault serves workloads.
-7. **Critical components are pinned and reviewed.** Renovate can propose updates, but storage and cluster upgrades are deliberately reviewed.
-8. **Backups are not considered proven until restore testing succeeds.**
-9. **Least privilege is preferred.** Backup identities can create snapshots but cannot restore them.
-10. **Observability is part of the platform, not an afterthought.**
+5. **Secrets do not belong in Git.** Vault owns workload secrets; ESO performs delivery.
+6. **Human and machine secrets are separated.** Human/break-glass material stays outside Kubernetes.
+7. **Critical components are pinned and reviewed.** Automation can propose updates without blindly applying them.
+8. **Backups are not proven until restore testing succeeds.**
+9. **Least privilege is preferred.** Backup identities do not receive restore permissions.
+10. **Observability is part of the platform.** Metrics, logs, network telemetry and ingress visibility belong in the same operational picture.
 
 ## Secrets architecture
 
@@ -162,37 +174,35 @@ See [docs/secrets.md](docs/secrets.md).
 
 ## Storage architecture
 
-Each cluster node exposes a dedicated encrypted SSD to Longhorn:
-
 ```text
-SSD
- |
- v
+Dedicated SSD
+     |
+     v
 TPM-backed LUKS2
- |
- v
-XFS
- |
- v
+     |
+     v
+     XFS
+     |
+     v
 /var/mnt/longhorn
- |
- v
-Longhorn
+     |
+     v
+  Longhorn
 ```
 
-Longhorn replication traffic uses a dedicated secondary interface through Multus and Whereabouts.
+Longhorn replication traffic uses a dedicated secondary interface through Multus and Whereabouts. The reference design uses two replicas for normal state and three replicas for critical platform state.
 
 See [infrastructure/longhorn/README.md](infrastructure/longhorn/README.md).
 
 ## Observability
 
-The public observability example includes Prometheus/Grafana, Loki, Alloy and a sanitized version of the NOC-style `KernelCafe // WAR ROOM` dashboard. It keeps the layout and query patterns while excluding real hosts, public domains, client addresses and production service inventory.
+The public observability example includes Prometheus/Grafana, Loki, Alloy and a sanitized version of the NOC-style `KernelCafe // WAR ROOM` dashboard. The layout and query patterns are preserved without publishing real hosts, domains, addresses or production service inventory.
 
-See [infrastructure/observability/README.md](infrastructure/observability/README.md) and [infrastructure/monitoring/dashboards/kernelcafe-war-room.yaml](infrastructure/monitoring/dashboards/kernelcafe-war-room.yaml).
+See [infrastructure/observability/README.md](infrastructure/observability/README.md) and [the War Room dashboard](infrastructure/monitoring/dashboards/kernelcafe-war-room.yaml).
 
 ## Disaster recovery
 
-The recovery order is intentionally dependency-aware:
+Recovery is dependency-aware rather than "apply everything and hope":
 
 ```text
 Talos / Kubernetes
@@ -207,33 +217,40 @@ Talos / Kubernetes
        Vault
         |
         v
-restore Vault snapshot
+restore verified Vault snapshot
         |
         v
-unseal / validate Raft
+unseal + validate Raft
         |
         v
 External Secrets Operator
         |
         v
-application secrets
+workload secrets
         |
         v
-workloads
+applications
 ```
 
 See [docs/disaster-recovery.md](docs/disaster-recovery.md).
 
-## Security
+## CI and dependency hygiene
 
-This repository uses Gitleaks in CI to scan repository history for accidental credentials.
+Two independent CI checks protect the public repository:
 
-The public repository intentionally does **not** contain:
+- **Validate** lints YAML and renders every committed Kustomize entry point.
+- **Gitleaks** scans Git history for accidental credential material.
+
+`renovate.json` enables dependency discovery and digest pinning while deliberately disabling automerge for critical platform components.
+
+## Security boundary
+
+This repository intentionally does **not** contain:
 
 - production domain names
 - hardware serial numbers
 - Omni machine UUIDs
-- production RFC1918 addressing
+- production RFC1918/VLAN addressing
 - Tailscale addresses
 - SSH host fingerprints
 - production backup destinations
@@ -241,7 +258,17 @@ The public repository intentionally does **not** contain:
 - Vault tokens or unseal material
 - kubeconfigs or Talos credentials
 - Cloudflare tokens
-- htpasswd values
+- production htpasswd values
+
+See [SECURITY.md](SECURITY.md) before reporting a possible sensitive-data exposure.
+
+## Contributing
+
+Contributions are welcome when they preserve the sanitization boundary and improve the reusable design. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+KernelCafe is available under the [MIT License](LICENSE).
 
 ## Status
 
