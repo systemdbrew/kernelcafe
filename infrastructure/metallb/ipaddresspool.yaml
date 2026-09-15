@@ -1,17 +1,10 @@
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
-  name: services
+  name: edge-vips
   namespace: metallb-system
 spec:
+  # Documentation-only VIPs. Production addresses are intentionally omitted.
   addresses:
-    - 10.10.90.10-10.10.90.30
----
-apiVersion: metallb.io/v1beta1
-kind: L2Advertisement
-metadata:
-  name: services
-  namespace: metallb-system
-spec:
-  ipAddressPools:
-    - services
+    - 10.10.90.10/32
+    - 10.10.90.11/32
