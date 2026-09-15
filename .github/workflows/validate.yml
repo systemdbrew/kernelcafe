@@ -45,3 +45,33 @@ jobs:
             kustomize build "$dir" >/dev/null
             echo "::endgroup::"
           done
+
+  helm-render:
+    name: Helm Render
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: v3.19.0
+
+      - name: Render Loki community chart
+        run: |
+          set -euo pipefail
+          helm repo add grafana-community https://grafana-community.github.io/helm-charts
+          helm repo update grafana-community
+          helm template loki grafana-community/loki \
+            --version 18.13.1 \
+            --namespace loki \
+            -f infrastructure/loki/values.yaml \
+            >/tmp/loki-rendered.yaml
+
+          grep -q 'name: loki-gateway' /tmp/loki-rendered.yaml
+          grep -q 'storageClassName: longhorn-standard' /tmp/loki-rendered.yaml
+          grep -q 'replication_factor: 1' /tmp/loki-rendered.yaml
+          grep -q 'object_store: filesystem' /tmp/loki-rendered.yaml
+          grep -q 'schema: v13' /tmp/loki-rendered.yaml
+          grep -q 'store: tsdb' /tmp/loki-rendered.yaml
