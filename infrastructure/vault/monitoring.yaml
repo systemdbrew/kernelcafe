@@ -1,0 +1,78 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vault
+  namespace: vault
+  labels:
+    app.kubernetes.io/name: vault
+spec:
+  namespaceSelector:
+    matchNames:
+      - vault
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vault
+      vault-internal: "true"
+  endpoints:
+    - port: http
+      path: /v1/sys/metrics
+      params:
+        format:
+          - prometheus
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: vault-health
+  namespace: vault
+  labels:
+    app.kubernetes.io/name: vault
+spec:
+  groups:
+    - name: vault.health
+      rules:
+        - alert: VaultSealed
+          expr: vault_core_unsealed == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Vault instance {{ $labels.instance }} is sealed"
+            description: "A Vault HA member has remained sealed for more than 2 minutes."
+        - alert: VaultNoActiveNode
+          expr: sum(vault_core_active) < 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Vault has no active node"
+            description: "No Vault HA member is reporting itself active. Check Raft quorum and pod health immediately."
+        - alert: VaultMultipleActiveNodes
+          expr: sum(vault_core_active) > 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Vault reports multiple active nodes"
+            description: "More than one Vault HA member is reporting itself active. Investigate cluster/Raft state immediately."
+        - alert: VaultTelemetryTargetMissing
+          expr: count(up{namespace="vault", job=~".*vault.*"} == 1) < 3
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Vault telemetry is missing one or more HA members"
+            description: "Prometheus has fewer than three healthy Vault scrape targets for 10 minutes."
+        - alert: VaultManualRolloutPending
+          expr: |
+            kube_statefulset_status_current_revision{namespace="vault", statefulset="vault"}
+              unless on (namespace, statefulset)
+            kube_statefulset_status_update_revision{namespace="vault", statefulset="vault"}
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Vault has a manual rollout pending"
+            description: "Vault's desired StatefulSet revision differs from the running revision. Vault intentionally uses OnDelete with Shamir sealing; perform the documented standby-first rollout and unseal procedure."
