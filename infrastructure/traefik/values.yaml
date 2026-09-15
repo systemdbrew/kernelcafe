@@ -20,9 +20,8 @@ ports:
     port: 8443
     exposedPort: 443
 
-logs:
-  general:
-    level: INFO
+log:
+  level: INFO
 
 accessLog:
   enabled: true
