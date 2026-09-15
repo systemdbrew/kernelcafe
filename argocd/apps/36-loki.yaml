@@ -7,13 +7,6 @@ metadata:
     argocd.argoproj.io/sync-wave: "36"
 spec:
   project: kernelcafe
-  source:
-    repoURL: https://grafana-community.github.io/helm-charts
-    chart: loki
-    targetRevision: 18.13.1
-    helm:
-      valueFiles:
-        - $values/infrastructure/loki/values.yaml
   sources:
     - repoURL: https://grafana-community.github.io/helm-charts
       chart: loki
