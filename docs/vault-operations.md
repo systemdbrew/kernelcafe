@@ -46,22 +46,30 @@ unsealed, and caught up.
 
 ## Monitoring
 
-The Vault Helm release creates a Prometheus `ServiceMonitor` that targets the
-`vault-internal` service so Prometheus can observe every Vault server. Vault's
-listener allows unauthenticated access only to the metrics endpoint.
+Vault monitoring is managed as standalone GitOps resources in
+`infrastructure/vault/monitoring.yaml` and applied by the `vault-monitoring`
+Argo CD application. The `ServiceMonitor` selects the headless `vault-internal`
+service, allowing Prometheus to scrape each of the three Vault members
+individually on the named `http` port. Vault's listener permits unauthenticated
+access to the metrics endpoint.
 
 Vault-specific alerts cover:
 
 - a server remaining sealed;
 - no active HA server;
 - more than one server reporting active;
-- fewer than three Vault telemetry targets.
+- fewer than three healthy Vault telemetry targets;
+- a pending manual `OnDelete` rollout.
 
 The upstream `KubeStatefulSetUpdateNotRolledOut` rule is disabled and replaced
-with a KernelCafe version that excludes only `vault/vault`. Vault gets a
-separate informational `VaultManualRolloutPending` alert after 30 minutes so a
-pending controlled upgrade remains visible without being treated as a failed
-rolling deployment.
+with a KernelCafe version that excludes only `vault/vault` so Vault's deliberate
+upgrade workflow is not reported as a generic failed rollout. The separate
+`VaultManualRolloutPending` warning remains visible after 30 minutes and points
+to the controlled standby-first procedure above.
+
+The monitoring design was verified against a three-member cluster: Prometheus
+reported all three `vault-internal` targets UP, all three members unsealed,
+exactly one active member, and all five Vault alert rules loaded and healthy.
 
 ## Auto-unseal
 

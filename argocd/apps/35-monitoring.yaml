@@ -58,48 +58,6 @@ spec:
                         StatefulSet {{ $labels.namespace }}/{{ $labels.statefulset }}
                         update has not been rolled out on cluster {{ $labels.cluster }}.
 
-                  - alert: VaultManualRolloutPending
-                    expr: |-
-                      (
-                        max by (namespace, statefulset, job, cluster) (
-                          kube_statefulset_status_current_revision{
-                            job="kube-state-metrics",
-                            namespace="vault",
-                            statefulset="vault"
-                          }
-                          unless
-                          kube_statefulset_status_update_revision{
-                            job="kube-state-metrics",
-                            namespace="vault",
-                            statefulset="vault"
-                          }
-                        )
-                        * on (namespace, statefulset, job, cluster)
-                        (
-                          kube_statefulset_replicas{
-                            job="kube-state-metrics",
-                            namespace="vault",
-                            statefulset="vault"
-                          }
-                          !=
-                          kube_statefulset_status_replicas_updated{
-                            job="kube-state-metrics",
-                            namespace="vault",
-                            statefulset="vault"
-                          }
-                        )
-                      )
-                    for: 30m
-                    labels:
-                      severity: info
-                    annotations:
-                      summary: Vault manual rollout is pending.
-                      description: >-
-                        Vault has a new StatefulSet revision waiting for its
-                        controlled OnDelete rollout. Upgrade standby members one
-                        at a time, unseal and verify Raft catch-up, then replace
-                        the active member.
-
         grafana:
           sidecar:
             dashboards:
