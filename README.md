@@ -273,5 +273,3 @@ KernelCafe is available under the [MIT License](LICENSE).
 ## Status
 
 This repository is derived from a functioning homelab platform rather than a hypothetical architecture. The production implementation is continuously updated and tested privately; reusable lessons and sanitized examples are published here.
-
-<!-- noreply merge test -->
