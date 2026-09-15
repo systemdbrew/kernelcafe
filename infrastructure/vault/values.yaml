@@ -66,3 +66,62 @@ ui:
 
 csi:
   enabled: false
+
+# Scrape every Vault server. The listener explicitly permits unauthenticated
+# metrics, so standbys can expose their own seal/HA state as well as the active.
+serverTelemetry:
+  serviceMonitor:
+    enabled: true
+    selectors:
+      release: monitoring
+    matchLabels:
+      vault-internal: "true"
+
+  prometheusRules:
+    enabled: true
+    selectors:
+      release: monitoring
+    rules:
+      - alert: VaultSealed
+        expr: vault_core_unsealed == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Vault server is sealed.
+          description: >-
+            Vault target {{ $labels.instance }} has remained sealed for more than
+            2 minutes. Unseal it before taking another Raft member offline.
+
+      - alert: VaultNoActiveNode
+        expr: sum(vault_core_active) < 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Vault has no active HA node.
+          description: >-
+            No scraped Vault server has reported itself active for more than
+            2 minutes. Check Raft quorum, seal state, and pod health.
+
+      - alert: VaultMultipleActiveNodes
+        expr: sum(vault_core_active) > 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Multiple Vault servers report active.
+          description: >-
+            More than one Vault server reports HA active state. Investigate
+            cluster connectivity and Raft leadership immediately.
+
+      - alert: VaultTelemetryTargetsMissing
+        expr: count(vault_core_unsealed) < 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Vault telemetry is missing one or more servers.
+          description: >-
+            Prometheus is receiving Vault core telemetry from fewer than the
+            expected three servers. Check the ServiceMonitor and Vault pods.
