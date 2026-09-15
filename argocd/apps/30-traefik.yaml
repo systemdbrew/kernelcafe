@@ -10,7 +10,7 @@ spec:
   sources:
     - repoURL: https://traefik.github.io/charts
       chart: traefik
-      targetRevision: 40.2.0
+      targetRevision: 41.5.0
       helm:
         valueFiles:
           - $values/infrastructure/traefik/values.yaml
@@ -26,3 +26,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
