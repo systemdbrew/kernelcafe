@@ -214,13 +214,16 @@ Talos / Kubernetes
      Longhorn
         |
         v
+independent Transit provider available/unsealed
+        |
+        v
        Vault
         |
         v
 restore verified Vault snapshot
         |
         v
-unseal + validate Raft
+verify auto-unseal + validate Raft
         |
         v
 External Secrets Operator
