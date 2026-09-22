@@ -2,13 +2,13 @@
 
 This public repository intentionally pins infrastructure dependencies rather than tracking floating tags. Pins are reviewed against upstream release channels before being changed.
 
-Audit date: 2026-09-15
+Audit date: 2026-09-21
 
 | Component | Public pin | Audit result |
 | --- | --- | --- |
 | Longhorn | 1.12.1 | Keep. Matches the KernelCafe production baseline and current v1.12 maintenance line. |
-| Vault Helm | 0.34.1 | Keep. Official chart currently pairs this with Vault 2.0.4. |
-| External Secrets Operator | 2.10.0 | Keep. Current upstream release. |
+| Vault Helm | 0.34.1 / Vault 2.1.1 image | Keep. The chart remains pinned while the public values explicitly match the validated production Vault image pin. |
+| External Secrets Operator | 2.11.0 | Updated to match the production pin after successful Argo CD reconciliation. |
 | MetalLB | 0.16.1 | Updated from 0.15.3 to the reviewed stable chart. |
 | cert-manager | v1.21.2 | Keep. Current documented upstream chart. |
 | Traefik | 41.5.0 | Updated from 40.2.0. Chart values were migrated from `logs.general` to the v41 `log` syntax. Review CRD upgrade notes before applying over an existing installation. |
