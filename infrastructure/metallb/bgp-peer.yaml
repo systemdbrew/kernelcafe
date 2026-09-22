@@ -1,0 +1,13 @@
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
+metadata:
+  name: edge-router
+  namespace: metallb-system
+spec:
+  # Private ASNs and documentation-only addressing model the production design
+  # without publishing the live routing configuration.
+  myASN: 64513
+  peerASN: 64512
+  peerAddress: 10.10.20.1
+  keepaliveTime: 1s
+  holdTime: 3s
