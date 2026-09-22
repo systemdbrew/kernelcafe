@@ -18,12 +18,14 @@ Vault uses:
 - integrated Raft storage
 - persistent volumes on the critical Longhorn StorageClass
 - Kubernetes authentication
-- Shamir sealing in the reference deployment
+- independent Transit auto-unseal in production; the portable public manifest intentionally omits provider-specific Transit configuration and therefore requires an operator-supplied seal/unseal design
 - a file audit device
 - no Agent Injector
 - no CSI provider
 
 External Secrets Operator reads Vault with a dedicated read-only policy and creates ordinary Kubernetes Secrets for workloads.
+
+The sanitized `infrastructure/vault/values.yaml` is intentionally portable: it does not contain the production Transit provider address, CA, key name, token Secret, or seal stanza. Production architecture is documented in [`vault-operations.md`](vault-operations.md). Do not interpret the absence of that environment-specific configuration from the public values file as production using Shamir for routine restarts.
 
 ## ESO flow
 
