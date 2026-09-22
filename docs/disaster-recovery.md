@@ -12,7 +12,7 @@ Important assets include:
 2. Talos/Omni recovery capability
 3. Longhorn or application backups where applicable
 4. verified Vault Raft snapshots
-5. externally-held Vault unseal/recovery material
+5. independently-held Vault and Transit-provider recovery material
 6. credentials required to bootstrap access to external systems
 
 These assets should not all share the same failure domain.
@@ -27,13 +27,16 @@ The conceptual restore sequence is:
 build Kubernetes
      |
      v
-deploy Vault
+restore/unseal Transit provider if required
+     |
+     v
+deploy Vault with Transit seal configuration
      |
      v
 restore verified Raft snapshot
      |
      v
-unseal Vault
+verify application Vault auto-unseals
      |
      v
 validate Raft quorum
@@ -43,6 +46,8 @@ enable ESO consumers
 ```
 
 Snapshot restore is a manual break-glass operation.
+
+Production uses an independent Transit Vault for application-Vault auto-unseal. Recovery therefore has an explicit dependency: the Transit provider must be available and unsealed before application Vault members that depend on it are restarted. The public manifests omit provider-specific addresses, certificates, key names and credentials.
 
 The scheduled backup ServiceAccount should have snapshot-read permission only.
 
@@ -55,7 +60,7 @@ The scheduled backup ServiceAccount should have snapshot-read permission only.
 4. restore platform networking and Longhorn
 5. deploy Vault
 6. restore a verified Vault snapshot
-7. unseal and validate Vault
+7. verify the Transit provider is available, then verify Vault auto-unseals and validate Raft
 8. validate Kubernetes auth
 9. start External Secrets Operator
 10. validate ClusterSecretStore
@@ -74,7 +79,7 @@ The drill should confirm:
 
 - snapshot checksum is valid
 - snapshot restore succeeds
-- the original seal material can unseal the restored state
+- the independent Transit provider can auto-unseal the restored state; break-glass recovery material is available if the provider itself must be recovered
 - Raft becomes healthy
 - expected KV metadata exists
 - no secret values are printed into logs during validation
