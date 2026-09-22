@@ -1,31 +1,21 @@
 # Vault operations
 
-KernelCafe runs a three-member HashiCorp Vault HA cluster backed by integrated
-Raft storage and Longhorn persistent volumes.
+KernelCafe runs a three-member HashiCorp Vault HA cluster backed by integrated Raft storage and persistent volumes.
 
 ## Upgrade model
 
-Vault intentionally uses the Helm chart's `OnDelete` StatefulSet strategy.
-Argo CD may update the StatefulSet pod template, but Kubernetes must not replace
-all Vault members automatically while Shamir sealing is in use.
+Vault uses the Helm chart's `OnDelete` StatefulSet strategy so upgrades remain deliberate and preserve Raft quorum. Never replace more than one member at a time.
 
 For an image or pod-template update:
 
 1. Confirm all three pods are Ready and unsealed.
-2. Confirm one node is active, two are standby, and Raft committed/applied
-   indexes are caught up.
+2. Confirm one node is active, two are standby, and Raft committed/applied indexes are caught up.
 3. Delete one standby pod.
-4. Wait for it to return on the new StatefulSet revision.
-5. If Shamir sealing is still configured, unseal it with the required key
-   shares. Never place unseal shares in Git, shell history, Kubernetes
-   manifests, or chat/log output.
-6. Confirm the upgraded member is Ready, standby, and caught up with Raft.
-7. Repeat for the second standby.
-8. Delete the old active member. The upgraded members should elect a new
-   active node.
-9. Unseal the recreated final member and verify it rejoins as Ready.
-10. Confirm all pods use the same image/revision, exactly one member is active,
-    all are unsealed, and Raft indexes are caught up.
+4. Wait for it to return on the new StatefulSet revision and verify it is unsealed.
+5. Confirm the upgraded member is Ready, standby, and caught up with Raft.
+6. Repeat for the second standby.
+7. Delete the old active member last.
+8. Confirm all pods use the desired image/revision, exactly one member is active, all are unsealed, and Raft indexes are caught up.
 
 Useful checks:
 
@@ -36,66 +26,73 @@ kubectl -n vault get pods -l app.kubernetes.io/name=vault \
 
 for pod in vault-0 vault-1 vault-2; do
   echo "===== $pod ====="
-  kubectl -n vault exec "$pod" -- vault status
-  echo
+  kubectl -n vault exec "$pod" -- vault status | \
+    grep -E 'Sealed|Version|HA Mode|Raft Committed|Raft Applied'
 done
 ```
 
-Do not delete a second member until the previously replaced member is Ready,
-unsealed, and caught up.
+Do not delete a second member until the previously replaced member is Ready, unsealed, and caught up.
+
+## Independent Transit auto-unseal
+
+Production KernelCafe uses a separate, independently operated Vault Transit service for auto-unseal. The public repository intentionally omits the provider address, certificate material, key name, token, and environment-specific Kubernetes Secret.
+
+The important architecture is:
+
+```text
+Application Vault (3-node Raft)
+        |
+        | Transit seal
+        | renewable periodic credential
+        v
+Independent Transit Vault
+```
+
+The Transit provider must not be the same Vault cluster it unseals; that would create a circular dependency during a full restart.
+
+A practical credential design is a renewable orphan periodic token with:
+
+- a least-privilege policy limited to the required Transit encrypt/decrypt paths;
+- the standard `default` policy retained so normal token self-renewal is available;
+- no explicit maximum TTL;
+- a period long enough to tolerate a reasonable provider outage;
+- `disable_renewal = "false"` in the Transit seal stanza.
+
+The production deployment uses a multi-day renewal period. Exact production addresses, key names, tokens, and recovery material are deliberately not published.
+
+Keep the independent Transit provider's own recovery mechanism operational. If the provider restarts sealed, restore/unseal it before restarting application Vault members that depend on it.
+
+## Renewal monitoring
+
+A Transit token can continue to work for an already-running Vault cluster until its lease expires, while a later pod restart fails to auto-unseal. For that reason, validate renewal rather than testing only a single encrypt/decrypt operation.
+
+The independent provider should record successful `auth/token/renew-self` events alongside Transit encrypt/decrypt activity. Alert or investigate repeated renewal failures before the periodic token expires.
+
+Never print tokens during diagnostics. Compare protected copies using byte counts or hashes when necessary.
+
+## Raft backups
+
+A production-grade backup job should not report success merely because `vault operator raft snapshot save` returned. KernelCafe's backup flow validates the snapshot, transfers it to separate storage, verifies SHA-256 at the destination, and only then reports the job successful.
+
+A useful operational lesson: when a Kubernetes Job uses an init container to create a snapshot, a failed init container can leave the later transfer container in `PodInitializing`. Diagnose the init-container logs first.
+
+After changes to the seal provider or its credential, run a manual backup and verify the entire snapshot -> transfer -> checksum path before considering the recovery complete.
 
 ## Monitoring
 
-Vault monitoring is managed as standalone GitOps resources in
-`infrastructure/vault/monitoring.yaml` and applied by the `vault-monitoring`
-Argo CD application. The `ServiceMonitor` selects the headless `vault-internal`
-service, allowing Prometheus to scrape each of the three Vault members
-individually on the named `http` port. Vault's listener permits unauthenticated
-access to the metrics endpoint.
-
-Vault-specific alerts cover:
+Vault monitoring is managed as standalone GitOps resources in `infrastructure/vault/monitoring.yaml`. Useful alerts cover:
 
 - a server remaining sealed;
 - no active HA server;
 - more than one server reporting active;
-- fewer than three healthy Vault telemetry targets;
-- a pending manual `OnDelete` rollout.
+- missing Vault telemetry targets;
+- a pending manual `OnDelete` rollout;
+- failed or stale backup jobs where backup automation is deployed.
 
-The upstream `KubeStatefulSetUpdateNotRolledOut` rule is disabled and replaced
-with a KernelCafe version that excludes only `vault/vault` so Vault's deliberate
-upgrade workflow is not reported as a generic failed rollout. The separate
-`VaultManualRolloutPending` warning remains visible after 30 minutes and points
-to the controlled standby-first procedure above.
+The generic StatefulSet rollout alert should account for Vault's deliberate `OnDelete` strategy so an intentional manual rollout is not mistaken for an unhealthy StatefulSet.
 
-The monitoring design was verified against a three-member cluster: Prometheus
-reported all three `vault-internal` targets UP, all three members unsealed,
-exactly one active member, and all five Vault alert rules loaded and healthy.
+## Recovery material
 
-## Auto-unseal
+Auto-unseal does not eliminate the need for recovery material. Keep recovery shares, root recovery credentials, Transit-provider recovery material, and any credential-store decryption key outside Git and in appropriately separated offline storage.
 
-Auto-unseal is the preferred future state, but it must not be configured until
-KernelCafe has an independent trusted seal provider. Integrated Raft storage is
-not itself an auto-unseal provider, and using this same Vault cluster as its own
-Transit seal creates a circular dependency.
-
-Suitable providers include a supported cloud KMS/HSM or a separate,
-independently operated Vault Transit service. The seal provider's credentials
-must be supplied through an appropriate workload identity or Kubernetes Secret
-that is not committed to this repository.
-
-Migration procedure once a provider is selected:
-
-1. Back up Vault Raft storage and verify the snapshot is recoverable.
-2. Configure the new seal stanza and provider identity/credentials.
-3. Follow HashiCorp's seal-migration procedure; do not simply replace the
-   Shamir stanza and restart every node.
-4. Migrate one member at a time and preserve Raft quorum.
-5. Restart a migrated member and verify it unseals without operator key entry.
-6. Verify all three members, HA leadership, Raft replication, telemetry, and
-   External Secrets consumers.
-7. Only after successful migration consider changing the StatefulSet rollout
-   strategy. Keeping `OnDelete` remains acceptable even with auto-unseal when
-   deliberate Vault upgrades are preferred.
-
-Until an independent seal provider is chosen and provisioned, Shamir remains
-the intentional seal mechanism.
+Do not rotate recovery shares, root tokens, or Transit keys merely because a pod failed to start. First determine whether the failure is the provider, network/TLS path, token lease, token policy, or seal configuration.
